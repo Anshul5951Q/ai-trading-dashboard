@@ -18,40 +18,26 @@ except ImportError:
 
 router = APIRouter(prefix="/advisor", tags=["advisor"])
 
-async def get_gemini_advice(ticker: str, rsi: float, macd: float, news_headlines: list) -> dict:
+async def get_bulk_advice(portfolio_data: list) -> dict:
+    """Sends a single request to Gemini to analyze the entire portfolio at once."""
     if not gemini_client:
-        return {"action": "HOLD", "reasoning": "Gemini API Key missing.", "sentiment_score": 0.5, "sentiment_label": "Neutral", "top_reasons": []}
+        return {ticker: {"action": "HOLD", "reasoning": "Gemini API Key missing."} for ticker in [d["ticker"] for d in portfolio_data]}
         
-    current_time = time.time()
-    
-    # Check MongoDB cache
-    cached_insight = await AIInsight.find_one(AIInsight.ticker == ticker)
-    if cached_insight and current_time - cached_insight.timestamp < CACHE_TTL:
-        return {
-            "action": cached_insight.action,
-            "reasoning": cached_insight.reasoning,
-            "sentiment_score": cached_insight.sentiment_score,
-            "sentiment_label": cached_insight.sentiment_label,
-            "top_reasons": cached_insight.top_reasons
-        }
-            
-    news_text = "\n".join([f"- {news}" for news in news_headlines]) if news_headlines else "No recent news available."
-    
     prompt = f"""
-    You are an expert AI stock trading advisor. Analyze the following data for {ticker}:
-    - Technicals: RSI is {rsi}, MACD is {macd}.
-    - Recent News Headlines:
-    {news_text}
+    You are an expert AI stock trading advisor. Analyze the following portfolio:
+    {json.dumps(portfolio_data)}
     
-    You must deeply analyze the context of the news against technical indicators.
+    For each stock, provide a BUY/SELL/HOLD action, a sentiment score (0-1), and a 2-sentence reasoning.
     
-    Return ONLY a valid JSON response in the exact format:
+    Return ONLY a valid JSON object where keys are ticker symbols:
     {{
-      "action": "BUY" | "SELL" | "HOLD", 
-      "sentiment_score": a float between 0.0 (very bearish) and 1.0 (very bullish),
-      "sentiment_label": "Bullish" | "Bearish" | "Neutral",
-      "top_reasons": ["Reason 1", "Reason 2"],
-      "reasoning": "A highly contextual 2-sentence explanation."
+      "TICKER": {{
+        "action": "BUY" | "SELL" | "HOLD",
+        "sentiment_score": float,
+        "sentiment_label": "Bullish" | "Bearish" | "Neutral",
+        "top_reasons": ["reason1", "reason2"],
+        "reasoning": "explanation"
+      }}
     }}
     """
     
@@ -63,54 +49,27 @@ async def get_gemini_advice(ticker: str, rsi: float, macd: float, news_headlines
                 config={"response_mime_type": "application/json"}
             )
         
-        advice = None
-        for attempt in range(3):
-            try:
-                response = await asyncio.to_thread(call_gemini)
-                advice = json.loads(response.text)
-                break
-            except Exception as e:
-                if "429" in str(e) and attempt < 2:
-                    await asyncio.sleep(6)
-                    continue
-                raise e
-                
-        if not advice:
-            raise Exception("Failed after retries")
-            
-        # Ensure default values if Gemini misses them
-        advice.setdefault("sentiment_score", 0.5)
-        advice.setdefault("sentiment_label", "Neutral")
-        advice.setdefault("top_reasons", [])
+        response = await asyncio.to_thread(call_gemini)
+        bulk_advice = json.loads(response.text)
         
-        # Save to DB
-        if cached_insight:
-            cached_insight.action = advice.get("action", "HOLD")
-            cached_insight.reasoning = advice.get("reasoning", "")
-            cached_insight.sentiment_score = float(advice["sentiment_score"])
-            cached_insight.sentiment_label = str(advice["sentiment_label"])
-            cached_insight.top_reasons = advice["top_reasons"]
-            cached_insight.timestamp = current_time
-            await cached_insight.save()
-        else:
-            new_insight = AIInsight(
-                ticker=ticker,
-                action=advice.get("action", "HOLD"),
-                sentiment_score=float(advice["sentiment_score"]),
-                sentiment_label=str(advice["sentiment_label"]),
-                top_reasons=advice["top_reasons"],
-                reasoning=advice.get("reasoning", ""),
-                timestamp=current_time
+        # Save each to DB cache
+        current_time = time.time()
+        for ticker, advice in bulk_advice.items():
+            await AIInsight.find_one(AIInsight.ticker == ticker).update(
+                {"$set": {
+                    "action": advice.get("action", "HOLD"),
+                    "sentiment_score": advice.get("sentiment_score", 0.5),
+                    "sentiment_label": advice.get("sentiment_label", "Neutral"),
+                    "top_reasons": advice.get("top_reasons", []),
+                    "reasoning": advice.get("reasoning", ""),
+                    "timestamp": current_time
+                }},
+                upsert=True
             )
-            await new_insight.insert()
-            
-        return advice
+        return bulk_advice
     except Exception as e:
-        print(f"Gemini error for {ticker}:", e)
-        error_str = str(e)
-        if "429" in error_str:
-            return {"action": "HOLD", "reasoning": "AI rate-limited (15 req/min). Please wait.", "sentiment_score": 0.5, "sentiment_label": "Neutral", "top_reasons": []}
-        return {"action": "HOLD", "reasoning": "Failed to generate AI advice.", "sentiment_score": 0.5, "sentiment_label": "Neutral", "top_reasons": []}
+        print("Bulk Gemini error:", e)
+        return {}
 
 async def get_portfolio_summary(recommendations: list) -> str:
     if not gemini_client:
@@ -148,26 +107,29 @@ async def get_portfolio_advice(current_user: User = Depends(get_current_user)):
     items = await PortfolioItem.find(PortfolioItem.user_id == current_user.id).to_list()
     
     if not items:
-        return {
-            "summary": "Your portfolio is empty. Add some stocks to get personalized AI advice!",
-            "recommendations": []
-        }
+        return {"summary": "Portfolio is empty.", "recommendations": []}
 
-    recommendations = []
-    
+    # 1. Gather all technical data first
+    portfolio_tech_data = []
     for item in items:
         try:
             analysis = await get_stock_analysis(item.ticker)
-            
-            # Use the AI recommendation natively generated by the updated analysis endpoint
-            advice = analysis.get("ai_recommendation", {"action": "HOLD", "reasoning": "Data unavailable."})
-            
-            advice["ticker"] = item.ticker
-            recommendations.append(advice)
-            
-        except Exception as e:
-            print(f"Failed to analyze {item.ticker}: {e}")
+            portfolio_tech_data.append({
+                "ticker": item.ticker,
+                "rsi": analysis["indicators"]["rsi"],
+                "macd": analysis["indicators"]["macd_hist"]
+            })
+        except:
             continue
+
+    # 2. Call Gemini ONCE for the entire portfolio
+    bulk_advice = await get_bulk_advice(portfolio_tech_data)
+
+    # 3. Format final response
+    recommendations = []
+    for ticker, advice in bulk_advice.items():
+        advice["ticker"] = ticker
+        recommendations.append(advice)
 
     summary = await get_portfolio_summary(recommendations)
 
