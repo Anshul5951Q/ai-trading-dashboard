@@ -121,21 +121,46 @@ async def get_stock_analysis(ticker: str):
     except Exception:
         current_price = float(latest["Close"])
 
-    # Generate Gemini Recommendation
-    from routers.advisor import get_gemini_advice
+    # Fast Heuristic Algorithm for Instant "AI" Recommendation
     rsi_val = latest.get("RSI_14")
+    macd_val = latest.get("MACD_12_26_9")
     macd_hist_val = latest.get("MACDh_12_26_9")
-    ai_recommendation = await get_gemini_advice(ticker, rsi_val, macd_hist_val, news_texts)
+    sma_val = latest.get("SMA_20")
+    
+    action = "HOLD"
+    reasoning = "Technicals are neutral; wait for a clear trend."
+    
+    if rsi_val and macd_hist_val and current_price and sma_val:
+        if rsi_val < 35 and macd_hist_val > 0 and current_price > sma_val * 0.95:
+            action = "BUY"
+            reasoning = f"RSI indicates the stock is nearing oversold levels, and MACD shows emerging bullish momentum."
+        elif rsi_val > 65 and macd_hist_val < 0:
+            action = "SELL"
+            reasoning = f"RSI is approaching overbought territory with bearish MACD divergence. Consider taking profits."
+        elif rsi_val < 30:
+            action = "BUY"
+            reasoning = "Deeply oversold conditions suggest a potential technical rebound."
+        elif rsi_val > 70:
+            action = "SELL"
+            reasoning = "Highly overbought conditions. High risk of a price correction."
+        elif macd_hist_val > 0 and current_price > sma_val:
+            action = "HOLD"
+            reasoning = "Uptrend is intact. Maintain current position."
+
+    ai_recommendation = {
+        "action": action,
+        "reasoning": reasoning
+    }
 
     return {
         "ticker": ticker,
         "current_price": current_price,
         "indicators": {
             "rsi": rsi_val,
-            "macd": latest.get("MACD_12_26_9"),
+            "macd": macd_val,
             "macd_signal": latest.get("MACDs_12_26_9"),
             "macd_hist": macd_hist_val,
-            "sma_20": latest.get("SMA_20"),
+            "sma_20": sma_val,
             "ema_20": latest.get("EMA_20")
         },
         "ai_recommendation": ai_recommendation,

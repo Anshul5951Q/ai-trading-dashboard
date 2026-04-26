@@ -118,6 +118,25 @@ async def get_gemini_advice(ticker: str, rsi: float, macd: float, news_headlines
             return {"action": "HOLD", "reasoning": "AI rate-limited (15 req/min). Please wait.", "sentiment_score": 0.5, "sentiment_label": "Neutral", "top_reasons": []}
         return {"action": "HOLD", "reasoning": "Failed to generate AI advice.", "sentiment_score": 0.5, "sentiment_label": "Neutral", "top_reasons": []}
 
+@router.get("/single/{ticker}")
+async def get_single_stock_advice(ticker: str, current_user: User = Depends(get_current_user)):
+    try:
+        data = await get_stock_analysis(ticker)
+        
+        from routers.analysis import fetch_newsapi, fetch_yfinance_news
+        news = fetch_newsapi(ticker)
+        if not news:
+            news = fetch_yfinance_news(ticker)
+            
+        rsi = data.get("indicators", {}).get("rsi", 50)
+        macd = data.get("indicators", {}).get("macd", 0)
+        
+        advice = await get_gemini_advice(ticker, rsi, macd, news)
+        return advice
+    except Exception as e:
+        print(f"Single advisor error: {e}")
+        return {"action": "HOLD", "reasoning": "Could not analyze this stock right now."}
+
 async def get_bulk_advice(portfolio_data: list) -> dict:
     """Sends a single request to Gemini to analyze the entire portfolio at once."""
     if not gemini_client:

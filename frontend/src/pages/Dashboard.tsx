@@ -9,6 +9,7 @@ import { LogOut, Plus, Trash2, TrendingUp, DollarSign, Activity, Shield } from '
 import { useNavigate } from 'react-router-dom';
 import MarketIndexCard from '../components/MarketIndexCard';
 import AIAdvisor from '../components/AIAdvisor';
+import StockCard from '../components/StockCard';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
@@ -229,6 +230,25 @@ export default function Dashboard() {
              )}
           </div>
         </div>
+
+        {/* Stock Cards Grid */}
+        {portfolio.length > 0 && (
+          <div className="pt-8 border-t border-border/50">
+            <h3 className="text-xl font-bold mb-6">Individual Stock Analysis</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {portfolio.map((item) => (
+                <StockCard 
+                  key={item.id}
+                  ticker={item.ticker}
+                  quantity={item.quantity}
+                  buyPrice={item.buy_price}
+                  currentPrice={item.current_price}
+                  profitLoss={item.profit_loss}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
   );
 }
