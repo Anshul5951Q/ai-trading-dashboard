@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
+from utils.indicators import calculate_rsi, calculate_macd, calculate_sma, calculate_ema
 import numpy as np
 from core.config import settings
 import requests
@@ -78,11 +78,14 @@ async def get_stock_analysis(ticker: str):
     if df.empty:
         raise HTTPException(status_code=404, detail="Stock data not found")
         
-    # Calculate indicators using pandas-ta
-    df.ta.sma(length=20, append=True)
-    df.ta.ema(length=20, append=True)
-    df.ta.rsi(length=14, append=True)
-    df.ta.macd(fast=12, slow=26, signal=9, append=True)
+    # Calculate indicators manually
+    df["SMA_20"] = calculate_sma(df["Close"], period=20)
+    df["EMA_20"] = calculate_ema(df["Close"], period=20)
+    df["RSI_14"] = calculate_rsi(df["Close"], period=14)
+    macd, signal, hist = calculate_macd(df["Close"])
+    df["MACD_12_26_9"] = macd
+    df["MACDs_12_26_9"] = signal
+    df["MACDh_12_26_9"] = hist
     
     # Fill NaNs with None for JSON serialization
     df = df.replace({np.nan: None})

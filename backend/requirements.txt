@@ -10,7 +10,6 @@ python-multipart
 yfinance
 pandas
 numpy
-pandas-ta
 vaderSentiment
 requests
 python-dotenv
