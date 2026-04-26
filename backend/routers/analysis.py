@@ -125,10 +125,10 @@ async def get_stock_analysis(ticker: str):
         "ticker": ticker,
         "current_price": current_price,
         "indicators": {
-            "rsi": rsi_val,
+            "rsi": latest.get("RSI_14"),
             "macd": latest.get("MACD_12_26_9"),
             "macd_signal": latest.get("MACDs_12_26_9"),
-            "macd_hist": macd_hist_val,
+            "macd_hist": latest.get("MACDh_12_26_9"),
             "sma_20": latest.get("SMA_20"),
             "ema_20": latest.get("EMA_20")
         },
