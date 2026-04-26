@@ -1,12 +1,12 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  LayoutDashboard, 
-  Briefcase, 
-  BellRing, 
-  Lightbulb, 
-  Settings2, 
+import {
+  LayoutDashboard,
+  Briefcase,
+  BellRing,
+  Lightbulb,
+  Settings2,
   LogOut,
   Activity
 } from 'lucide-react';
@@ -37,7 +37,7 @@ export default function AppLayout() {
             <Activity className="h-6 w-6 text-primary" />
           </div>
           <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
-            Antigravity
+            TradeSense AI
           </h1>
         </div>
 
@@ -49,10 +49,9 @@ export default function AppLayout() {
                 key={item.path}
                 to={item.path}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
-                    isActive 
-                      ? 'bg-primary/10 text-primary border border-primary/20 shadow-lg shadow-primary/5' 
-                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${isActive
+                    ? 'bg-primary/10 text-primary border border-primary/20 shadow-lg shadow-primary/5'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`
                 }
               >
@@ -64,7 +63,7 @@ export default function AppLayout() {
         </nav>
 
         <div className="p-4 border-t border-border/50">
-          <button 
+          <button
             onClick={handleLogout}
             className="flex items-center gap-3 px-4 py-3 w-full rounded-lg font-medium text-gray-400 hover:text-danger hover:bg-danger/10 transition-colors"
           >
