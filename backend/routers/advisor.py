@@ -60,7 +60,7 @@ async def get_gemini_advice(ticker: str, rsi: float, macd: float, news_headlines
     try:
         def call_gemini():
             return gemini_client.models.generate_content(
-                model='gemini-flash-lite-latest',
+                model='gemini-1.5-flash',
                 contents=prompt,
                 config={"response_mime_type": "application/json"}
             )
@@ -73,7 +73,15 @@ async def get_gemini_advice(ticker: str, rsi: float, macd: float, news_headlines
             for attempt in range(3):
                 try:
                     response = await asyncio.to_thread(call_gemini)
-                    advice = json.loads(response.text)
+                    
+                    # Clean markdown backticks if Gemini ignores mime_type
+                    raw_text = response.text.strip()
+                    if raw_text.startswith("```json"):
+                        raw_text = raw_text[7:]
+                    if raw_text.endswith("```"):
+                        raw_text = raw_text[:-3]
+                        
+                    advice = json.loads(raw_text.strip())
                     break
                 except Exception as e:
                     if "429" in str(e) and attempt < 2:
@@ -116,7 +124,7 @@ async def get_gemini_advice(ticker: str, rsi: float, macd: float, news_headlines
         error_str = str(e)
         if "429" in error_str:
             return {"action": "HOLD", "reasoning": "AI rate-limited (15 req/min). Please wait.", "sentiment_score": 0.5, "sentiment_label": "Neutral", "top_reasons": []}
-        return {"action": "HOLD", "reasoning": "Failed to generate AI advice.", "sentiment_score": 0.5, "sentiment_label": "Neutral", "top_reasons": []}
+        return {"action": "HOLD", "reasoning": f"API Error: {error_str[:100]}", "sentiment_score": 0.5, "sentiment_label": "Neutral", "top_reasons": []}
 
 @router.get("/single/{ticker}")
 async def get_single_stock_advice(ticker: str, current_user: User = Depends(get_current_user)):
