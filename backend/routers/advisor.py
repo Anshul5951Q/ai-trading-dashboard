@@ -60,7 +60,7 @@ async def get_gemini_advice(ticker: str, rsi: float, macd: float, news_headlines
     try:
         def call_gemini():
             return gemini_client.models.generate_content(
-                model='gemini-1.5-flash',
+                model='gemini-2.5-flash',
                 contents=prompt,
                 config={"response_mime_type": "application/json"}
             )
@@ -171,7 +171,7 @@ async def get_bulk_advice(portfolio_data: list) -> dict:
     try:
         def call_gemini():
             return gemini_client.models.generate_content(
-                model='gemini-flash-lite-latest',
+                model='gemini-2.5-flash',
                 contents=prompt,
                 config={"response_mime_type": "application/json"}
             )
