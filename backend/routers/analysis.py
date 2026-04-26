@@ -121,16 +121,23 @@ async def get_stock_analysis(ticker: str):
     except Exception:
         current_price = float(latest["Close"])
 
+    # Generate Gemini Recommendation
+    from routers.advisor import get_gemini_advice
+    rsi_val = latest.get("RSI_14")
+    macd_hist_val = latest.get("MACDh_12_26_9")
+    ai_recommendation = await get_gemini_advice(ticker, rsi_val, macd_hist_val, news_texts)
+
     return {
         "ticker": ticker,
         "current_price": current_price,
         "indicators": {
-            "rsi": latest.get("RSI_14"),
+            "rsi": rsi_val,
             "macd": latest.get("MACD_12_26_9"),
             "macd_signal": latest.get("MACDs_12_26_9"),
-            "macd_hist": latest.get("MACDh_12_26_9"),
+            "macd_hist": macd_hist_val,
             "sma_20": latest.get("SMA_20"),
             "ema_20": latest.get("EMA_20")
         },
+        "ai_recommendation": ai_recommendation,
         "historical_data": historical_data
     }
