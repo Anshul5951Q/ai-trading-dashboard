@@ -101,26 +101,6 @@ export default function StockCard({ ticker, quantity, buyPrice, currentPrice, pr
               </div>
             </div>
 
-            {/* AI Recommendation */}
-            <div className="pt-2">
-              <div className="flex flex-col gap-2 bg-background/50 p-3 rounded-lg border border-border/50">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-gray-400 flex items-center gap-1">
-                    <Bot className="h-4 w-4 text-primary" /> AI Recommendation
-                  </p>
-                  <span className={`text-[10px] font-bold px-2 py-1 rounded border ${
-                    data.ai_recommendation?.action === 'BUY' ? 'bg-accent/10 text-accent border-accent/20' : 
-                    data.ai_recommendation?.action === 'SELL' ? 'bg-danger/10 text-danger border-danger/20' : 
-                    'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                  }`}>
-                    {data.ai_recommendation?.action || 'HOLD'}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-400 leading-relaxed border-t border-border/50 pt-2 mt-1">
-                  {data.ai_recommendation?.reasoning || 'Analyzing market data...'}
-                </p>
-              </div>
-            </div>
           </>
         )}
       </div>
