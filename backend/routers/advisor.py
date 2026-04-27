@@ -177,7 +177,15 @@ async def get_bulk_advice(portfolio_data: list) -> dict:
             )
         
         response = await asyncio.to_thread(call_gemini)
-        bulk_advice = json.loads(response.text)
+        
+        # Clean markdown backticks if Gemini ignores mime_type
+        raw_text = response.text.strip()
+        if raw_text.startswith("```json"):
+            raw_text = raw_text[7:]
+        if raw_text.endswith("```"):
+            raw_text = raw_text[:-3]
+            
+        bulk_advice = json.loads(raw_text.strip())
         
         # Save each to DB cache
         current_time = time.time()
