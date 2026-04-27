@@ -190,21 +190,31 @@ async def get_bulk_advice(portfolio_data: list) -> dict:
         # Save each to DB cache
         current_time = time.time()
         for ticker, advice in bulk_advice.items():
-            await AIInsight.find_one(AIInsight.ticker == ticker).update(
-                {"$set": {
-                    "action": advice.get("action", "HOLD"),
-                    "sentiment_score": advice.get("sentiment_score", 0.5),
-                    "sentiment_label": advice.get("sentiment_label", "Neutral"),
-                    "top_reasons": advice.get("top_reasons", []),
-                    "reasoning": advice.get("reasoning", ""),
-                    "timestamp": current_time
-                }},
-                upsert=True
-            )
+            insight = await AIInsight.find_one(AIInsight.ticker == ticker)
+            if insight:
+                insight.action = advice.get("action", "HOLD")
+                insight.sentiment_score = float(advice.get("sentiment_score", 0.5))
+                insight.sentiment_label = str(advice.get("sentiment_label", "Neutral"))
+                insight.top_reasons = advice.get("top_reasons", [])
+                insight.reasoning = advice.get("reasoning", "")
+                insight.timestamp = current_time
+                await insight.save()
+            else:
+                new_insight = AIInsight(
+                    ticker=ticker,
+                    action=advice.get("action", "HOLD"),
+                    sentiment_score=float(advice.get("sentiment_score", 0.5)),
+                    sentiment_label=str(advice.get("sentiment_label", "Neutral")),
+                    top_reasons=advice.get("top_reasons", []),
+                    reasoning=advice.get("reasoning", ""),
+                    timestamp=current_time
+                )
+                await new_insight.insert()
         return bulk_advice
     except Exception as e:
         print("Bulk Gemini error:", e)
-        return {}
+        # Return the error in a predictable way so the UI doesn't break
+        return {"error": {"action": "HOLD", "reasoning": f"Failed to generate bulk advice: {str(e)}"}}
 
 async def get_portfolio_summary(recommendations: list) -> str:
     if not gemini_client:
