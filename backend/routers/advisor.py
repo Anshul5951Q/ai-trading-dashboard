@@ -213,8 +213,39 @@ async def get_bulk_advice(portfolio_data: list) -> dict:
         return bulk_advice
     except Exception as e:
         print("Bulk Gemini error:", e)
-        # Return the error in a predictable way so the UI doesn't break
-        return {"error": {"action": "HOLD", "reasoning": f"Failed to generate bulk advice: {str(e)}"}}
+        # Fallback to Heuristic Math Algorithm if Gemini is rate limited
+        bulk_advice = {}
+        for item in portfolio_data:
+            ticker = item.get("ticker", "UNKNOWN")
+            rsi = item.get("rsi")
+            macd = item.get("macd")
+            
+            action = "HOLD"
+            reasoning = f"Gemini API rate limit reached ({str(e)[:40]}...). Falling back to mathematical heuristics."
+            score = 0.5
+            label = "Neutral"
+            
+            if rsi is not None and macd is not None:
+                if rsi < 35 and macd > 0:
+                    action = "BUY"
+                    reasoning = "Gemini API rate limit reached. Heuristic fallback indicates oversold levels with bullish momentum."
+                    score = 0.8
+                    label = "Bullish"
+                elif rsi > 65 and macd < 0:
+                    action = "SELL"
+                    reasoning = "Gemini API rate limit reached. Heuristic fallback indicates overbought levels with bearish divergence."
+                    score = 0.2
+                    label = "Bearish"
+            
+            bulk_advice[ticker] = {
+                "action": action,
+                "sentiment_score": score,
+                "sentiment_label": label,
+                "top_reasons": ["Heuristic Fallback Triggered", f"RSI indicates {label}"],
+                "reasoning": reasoning
+            }
+            
+        return bulk_advice
 
 async def get_portfolio_summary(recommendations: list) -> str:
     if not gemini_client:
